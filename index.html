@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Team-Leada · Raum-Modus</title>
+<meta name="description" content="Konzept-Prototyp: Leada steht als Gerät in der Tischmitte, moderiert ein Team-Treffen, hält fest und vertritt eine abwesende Kollegin.">
+<meta name="theme-color" content="#0F1715">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0F1715;
+    --surface: rgba(21, 32, 29, 0.82);
+    --surface-solid: #15201D;
+    --line: rgba(233, 239, 236, 0.12);
+    --text: #E9EFEC;
+    --muted: #9DB0AA;
+    --accent: #2F9AA3;
+    --accent-soft: rgba(47, 154, 163, 0.18);
+    --gold: #D4AF6A;
+    --gold-soft: rgba(212, 175, 106, 0.16);
+    --coral: #E08A7B;
+    --font-sans: 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-voice: 'Newsreader', Georgia, 'Times New Roman', serif;
+    --gutter: 16px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-sans); overflow: hidden; }
+  button { font: inherit; color: inherit; }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #labels { position: fixed; inset: 0; pointer-events: none; }
+
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+
+  header { position: fixed; top: var(--gutter); left: var(--gutter); padding: 12px 16px; max-width: 320px; }
+  header h1 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: 0.01em; }
+  header p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+
+  /* Zustände */
+  #states { position: fixed; left: var(--gutter); top: 92px; width: 260px; padding: 14px; }
+  #states h2, #board h2 { margin: 0 0 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; transition: background .2s, border-color .2s; }
+  .chip:hover { background: var(--accent-soft); }
+  .chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+  .chip[data-state="mute"][aria-pressed="true"] { background: rgba(224, 138, 123, .16); border-color: var(--coral); }
+  #states p { margin: 10px 0 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+
+  /* Board */
+  #board { position: fixed; right: var(--gutter); top: var(--gutter); width: 300px; max-height: calc(100% - 260px); overflow: auto; padding: 14px; }
+  #board ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: rgba(255,255,255,0.03); transition: border-color .6s, background .6s; }
+  .card.fresh { border-color: var(--gold); background: var(--gold-soft); animation: pop .6s ease-out; }
+  .card .t { font-size: 14px; font-weight: 500; line-height: 1.35; }
+  .card .m { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .card .tag { display: inline-block; margin-top: 6px; font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .card .tag.ok { color: var(--accent); border-color: rgba(47,154,163,.5); }
+  .card .tag.wait { color: var(--gold); border-color: rgba(212,175,106,.5); }
+  .card .note { font-size: 11px; color: var(--gold); margin-top: 6px; }
+  .board-hint { font-size: 12px; color: var(--muted); margin: 10px 0 0; line-height: 1.4; }
+  @keyframes pop { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  /* Untertitel + Steuerung */
+  #dock { position: fixed; left: 50%; bottom: var(--gutter); transform: translateX(-50%); width: min(760px, calc(100% - 2 * var(--gutter))); display: flex; flex-direction: column; gap: 8px; }
+  #sub { padding: 14px 18px 16px; min-height: 96px; }
+  #sub .who { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  #sub .who .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  #sub .text { margin-top: 6px; font-size: 17px; line-height: 1.45; min-height: 1.45em; }
+  #sub.leada .who { color: var(--accent); }
+  #sub.leada .who .dot { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  #sub.leada .text { font-family: var(--font-voice); font-size: 21px; line-height: 1.4; }
+  #sub.system .text { color: var(--muted); font-style: italic; font-size: 15px; }
+  #sub.muted .who { color: var(--coral); }
+  #sub.muted .who .dot { background: var(--coral); }
+  #sub .text q { font-style: italic; color: var(--gold); quotes: '„' '“'; }
+
+  #bar { display: flex; align-items: center; gap: 6px; padding: 8px; flex-wrap: wrap; }
+  .btn { border: 1px solid transparent; background: transparent; border-radius: 10px; padding: 8px 12px; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .btn:hover { background: rgba(255,255,255,.06); }
+  .btn:focus-visible, .chip:focus-visible, .cta:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.primary:hover { background: #3AA9B2; }
+  .btn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+  .btn.mute[aria-pressed="true"] { border-color: var(--coral); background: rgba(224,138,123,.16); }
+  #progress { flex: 1; min-width: 90px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); padding: 0 6px; }
+  #progress .track { flex: 1; height: 3px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  #progress .fill { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+  .sep { width: 1px; height: 22px; background: var(--line); margin: 0 2px; }
+
+  #mutebadge { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -160px); padding: 8px 14px; border-radius: 999px; background: rgba(224,138,123,.14); border: 1px solid var(--coral); color: var(--coral); font-size: 13px; font-weight: 500; opacity: 0; transition: opacity .4s; pointer-events: none; white-space: nowrap; }
+  #mutebadge.on { opacity: 1; }
+
+  /* Start-Karte */
+  #intro { position: fixed; inset: 0; display: grid; place-items: center; padding: var(--gutter); background: radial-gradient(ellipse at center, rgba(15,23,21,.55), rgba(15,23,21,.9)); z-index: 10; }
+  #intro .panel { max-width: 520px; padding: 28px; }
+  #intro .eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  #intro h2 { font-family: var(--font-voice); font-weight: 400; font-size: 32px; line-height: 1.15; margin: 8px 0 12px; }
+  #intro p { margin: 0 0 12px; line-height: 1.55; color: var(--muted); font-size: 15px; }
+  #intro p strong { color: var(--text); font-weight: 500; }
+  #intro .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; align-items: center; }
+  .cta { border: 0; border-radius: 10px; padding: 11px 18px; font-size: 15px; font-weight: 500; cursor: pointer; background: var(--accent); color: #fff; }
+  .cta.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); }
+  #intro label { font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; margin-top: 14px; cursor: pointer; }
+  #intro .fine { font-size: 12px; margin-top: 16px; }
+
+  /* Namensschilder in der Szene */
+  .tag3d { font-family: var(--font-sans); font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(15,23,21,.72); border: 1px solid var(--line); color: var(--text); white-space: nowrap; transition: border-color .3s, color .3s; text-align: center; }
+  .tag3d small { display: block; font-size: 10px; color: var(--muted); }
+  .tag3d.speaking { border-color: var(--accent); }
+  .tag3d.addressed { border-color: var(--gold); }
+  .tag3d.absent { border-style: dashed; color: var(--muted); }
+  .tag3d.leada { color: var(--accent); border-color: rgba(47,154,163,.4); }
+
+  #toggles { display: none; }
+
+  @media (max-width: 960px) {
+    #states { display: none; top: auto; bottom: calc(var(--dock-h, 200px) + 24px); width: calc(100% - 2 * var(--gutter)); }
+    #board { display: none; top: auto; bottom: calc(var(--dock-h, 200px) + 24px); width: calc(100% - 2 * var(--gutter)); max-height: 45vh; }
+    #states.open, #board.open { display: block; }
+    #toggles { display: flex; position: fixed; top: var(--gutter); right: var(--gutter); gap: 6px; }
+    #toggles .btn { background: var(--surface); border: 1px solid var(--line); backdrop-filter: blur(14px); }
+    header { max-width: calc(100% - 210px); padding: 10px 12px; }
+    header p { display: none; }
+  }
+  @media (max-width: 560px) {
+    #sub { min-height: 84px; padding: 12px 14px; }
+    #sub .text { font-size: 15px; }
+    #sub.leada .text { font-size: 18px; }
+    .btn .lbl { display: none; }
+    #progress .count { display: none; }
+    #mutebadge { transform: translate(-50%, -120px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card.fresh { animation: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="scene" aria-label="3D-Szene: ein runder Tisch, in der Mitte Leada als Gerät mit abstraktem Gesicht, um den Tisch drei Personen und ein leerer Platz"></canvas>
+<div id="labels"></div>
+
+<header class="panel">
+  <h1>Team-Leada</h1>
+  <p>Raum-Modus · Konzept-Prototyp</p>
+</header>
+
+<div id="toggles">
+  <button class="btn" id="tgStates" aria-expanded="false" aria-controls="states">Zustände</button>
+  <button class="btn" id="tgBoard" aria-expanded="false" aria-controls="board">Board</button>
+</div>
+
+<section id="states" class="panel" aria-labelledby="statesH">
+  <h2 id="statesH">Zustände ausprobieren</h2>
+  <div class="chips" role="group" aria-label="Zustand von Leada">
+    <button class="chip" data-state="rest" aria-pressed="false">Ruhe</button>
+    <button class="chip" data-state="listen" aria-pressed="false">Zuhören</button>
+    <button class="chip" data-state="think" aria-pressed="false">Denken</button>
+    <button class="chip" data-state="speak" aria-pressed="false">Sprechen</button>
+    <button class="chip" data-state="mute" aria-pressed="false">Stumm</button>
+  </div>
+  <p id="stateInfo">Tipp: Ziehen dreht die Ansicht. Ein Klick auf den Sockel betätigt den Stummschalter.</p>
+</section>
+
+<aside id="board" class="panel" aria-labelledby="boardH">
+  <h2 id="boardH">Zusammenarbeit · Board</h2>
+  <ul id="cards" aria-live="polite"></ul>
+  <p class="board-hint">Leada schreibt nur auf, was das Team bestätigt hat. Gold = gerade festgehalten.</p>
+</aside>
+
+<div id="mutebadge" role="status">Mikrofon getrennt · Leada hört nichts und merkt sich nichts</div>
+
+<div id="dock">
+  <div id="sub" class="panel system" aria-live="polite">
+    <div class="who"><span class="dot"></span><span id="whoName">Team-Weekly</span></div>
+    <div class="text" id="subText">Dienstag, 9:00 Uhr. Drei sind da, Anna fehlt heute.</div>
+  </div>
+  <div id="bar" class="panel" role="toolbar" aria-label="Steuerung">
+    <button class="btn" id="prev" aria-label="Zurück">◀<span class="lbl">Zurück</span></button>
+    <button class="btn primary" id="play" aria-label="Abspielen">▶<span class="lbl">Abspielen</span></button>
+    <button class="btn" id="next" aria-label="Weiter"><span class="lbl">Weiter</span>▶</button>
+    <div id="progress"><div class="track"><div class="fill" id="fill"></div></div><span class="count" id="count">0 / 0</span></div>
+    <span class="sep" aria-hidden="true"></span>
+    <button class="btn" id="cam" aria-pressed="true" title="Die Kamera setzt dich auf den Platz, dem Leada sich zuwendet">🎥<span class="lbl">Kamera folgt</span></button>
+    <button class="btn" id="voice" aria-pressed="false" title="Leadas Sätze mit der Sprachausgabe des Browsers vorlesen">🔈<span class="lbl">Stimme</span></button>
+    <button class="btn mute" id="mute" aria-pressed="false" title="Stummschalter am Sockel (Taste M)">🎙<span class="lbl">Stummschalter</span></button>
+  </div>
+</div>
+
+<div id="intro">
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="introH">
+    <div class="eyebrow">Konzept-Prototyp</div>
+    <h2 id="introH">Leada sitzt mit am Tisch.</h2>
+    <p>Ein Team-Weekly, zehn Minuten in drei. In der Tischmitte steht <strong>Leada als Gerät</strong>: Sie gibt den Rhythmus vor, erinnert an Zusagen, hält Entscheidungen erst nach Bestätigung fest und <strong>vertritt Anna</strong>, die heute fehlt, aber nur mit dem, was Anna freigegeben hat.</p>
+    <p>Am Sockel sitzt ein <strong>echter Stummschalter</strong>. Ist er umgelegt, hört Leada nichts mehr.</p>
+    <label><input type="checkbox" id="introVoice"> Leadas Sätze vorlesen (Sprachausgabe des Browsers)</label>
+    <div class="row">
+      <button class="cta" id="start">Treffen starten</button>
+      <button class="cta ghost" id="explore">Erst umsehen</button>
+    </div>
+    <p class="fine">Alle Personen und Inhalte sind erfunden. Tastatur: Leertaste = Abspielen/Pause, ← → = Schritte, M = Stummschalter.</p>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+const ACCENT = new THREE.Color('#2F9AA3');
+const GOLD = new THREE.Color('#D4AF6A');
+const CORAL = new THREE.Color('#E08A7B');
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (id) => document.getElementById(id);
+
+// ───────────────────────── Szene ─────────────────────────
+const canvas = $('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#0F1715');
+scene.fog = new THREE.Fog('#0F1715', 10, 24);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 100);
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, 0.85, 0);
+controls.enableDamping = true;
+controls.enablePan = false;
+controls.minDistance = 2.4;
+controls.maxDistance = 11;
+controls.maxPolarAngle = Math.PI * 0.47;
+
+const labelRenderer = new CSS2DRenderer({ element: $('labels') });
+labelRenderer.setSize(innerWidth, innerHeight);
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.75, 0.55, 0.62);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+// Licht
+scene.add(new THREE.HemisphereLight('#bcd4cf', '#1a1410', 0.35));
+const key = new THREE.SpotLight('#ffe6c7', 24, 14, Math.PI / 5, 0.6, 1.6);
+key.position.set(1.5, 6.5, 2);
+key.target.position.set(0, 0.7, 0);
+key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024);
+key.shadow.bias = -0.0004;
+scene.add(key, key.target);
+const rim = new THREE.DirectionalLight('#6fb6bd', 0.5);
+rim.position.set(-5, 3, -4);
+scene.add(rim);
+
+// Boden + Teppich
+const floor = new THREE.Mesh(new THREE.CircleGeometry(30, 64), new THREE.MeshStandardMaterial({ color: '#141c1a', roughness: 0.95 }));
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+const rug = new THREE.Mesh(new THREE.CircleGeometry(4.2, 96), new THREE.MeshStandardMaterial({ color: '#1d2925', roughness: 1 }));
+rug.rotation.x = -Math.PI / 2;
+rug.position.y = 0.005;
+rug.receiveShadow = true;
+scene.add(rug);
+
+// Tisch
+const TABLE_Y = 0.75;
+const wood = new THREE.MeshStandardMaterial({ color: '#33251c', roughness: 0.72, metalness: 0, envMapIntensity: 0.35 });
+const top = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.0, 0.06, 96), wood);
+top.position.y = TABLE_Y - 0.03;
+top.castShadow = top.receiveShadow = true;
+scene.add(top);
+const edge = new THREE.Mesh(new THREE.TorusGeometry(2.0, 0.03, 12, 128), wood);
+edge.rotation.x = Math.PI / 2;
+edge.position.y = TABLE_Y - 0.03;
+scene.add(edge);
+const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, TABLE_Y - 0.06, 32), new THREE.MeshStandardMaterial({ color: '#2a201a', roughness: 0.6 }));
+stem.position.y = (TABLE_Y - 0.06) / 2;
+stem.castShadow = true;
+scene.add(stem);
+const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.75, 0.04, 48), stem.material);
+foot.position.y = 0.02;
+scene.add(foot);
+
+// ───────────────────────── Leada (das Gerät) ─────────────────────────
+const leada = new THREE.Group();
+leada.position.y = TABLE_Y;
+scene.add(leada);
+
+const fabric = new THREE.MeshStandardMaterial({ color: '#2b3330', roughness: 1 });
+const base = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.33, 0.14, 64), fabric);
+base.position.y = 0.07;
+base.castShadow = true;
+leada.add(base);
+
+const ringMat = new THREE.MeshBasicMaterial({ color: ACCENT.clone(), transparent: true, opacity: 0.4 });
+const ring = new THREE.Mesh(new THREE.TorusGeometry(0.292, 0.011, 16, 160), ringMat);
+ring.rotation.x = Math.PI / 2;
+ring.position.y = 0.143;
+leada.add(ring);
+
+// Lichtbogen: wendet sich der Person zu, der Leada zuhört
+const arcMat = new THREE.MeshBasicMaterial({ color: ACCENT.clone().multiplyScalar(1.6), transparent: true, opacity: 0 });
+const arcPivot = new THREE.Group();
+arcPivot.position.y = 0.145;
+leada.add(arcPivot);
+const arc = new THREE.Mesh(new THREE.TorusGeometry(0.296, 0.02, 12, 64, Math.PI / 2.6), arcMat);
+arc.rotation.x = Math.PI / 2;
+arcPivot.add(arc);
+
+const HEAD_Y = 0.40;
+const core = new THREE.Mesh(new THREE.SphereGeometry(0.165, 64, 32), new THREE.MeshStandardMaterial({ color: '#0c1816', emissive: ACCENT.clone(), emissiveIntensity: 0.5, roughness: 0.35 }));
+core.position.y = HEAD_Y;
+leada.add(core);
+
+const dome = new THREE.Mesh(new THREE.SphereGeometry(0.27, 64, 32), new THREE.MeshPhysicalMaterial({ color: '#d6efec', roughness: 0.04, metalness: 0, clearcoat: 1, transparent: true, opacity: 0.13, depthWrite: false, envMapIntensity: 1.4 }));
+dome.position.y = HEAD_Y;
+leada.add(dome);
+
+const glow = new THREE.PointLight(ACCENT.clone(), 1.2, 3, 1.6);
+glow.position.y = HEAD_Y;
+leada.add(glow);
+
+// Gesicht: zwei Lichtpunkte und ein Wellenzug als Stimme
+const face = new THREE.Group();
+face.position.y = HEAD_Y;
+leada.add(face);
+const eyeMat = new THREE.MeshBasicMaterial({ color: '#EAF7F6', transparent: true, opacity: 1 });
+const eyes = [-1, 1].map((s) => {
+  const e = new THREE.Mesh(new THREE.SphereGeometry(0.021, 24, 16), eyeMat);
+  e.position.set(0.058 * s, 0.035, 0.2);
+  e.scale.set(1, 1.3, 0.5);
+  face.add(e);
+  return e;
+});
+const barMat = new THREE.MeshBasicMaterial({ color: GOLD.clone().multiplyScalar(1.4), transparent: true, opacity: 0 });
+const bars = [];
+for (let i = 0; i < 7; i++) {
+  const b = new THREE.Mesh(new THREE.BoxGeometry(0.011, 0.05, 0.008), barMat);
+  const x = (i - 3) * 0.019;
+  b.position.set(x, -0.055, 0.206 - Math.abs(x) * 0.25);
+  face.add(b);
+  bars.push(b);
+}
+
+// Stummschalter am Sockel
+const switchGroup = new THREE.Group();
+switchGroup.position.set(0, 0.075, 0.325);
+leada.add(switchGroup);
+const switchPlate = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.05, 0.02), new THREE.MeshStandardMaterial({ color: '#1c2220', roughness: 0.6 }));
+switchGroup.add(switchPlate);
+const lever = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.034, 0.03), new THREE.MeshStandardMaterial({ color: '#cfd8d5', roughness: 0.4 }));
+lever.position.set(-0.018, 0, 0.015);
+switchGroup.add(lever);
+const ledMat = new THREE.MeshBasicMaterial({ color: ACCENT.clone() });
+const led = new THREE.Mesh(new THREE.SphereGeometry(0.008, 12, 8), ledMat);
+led.position.set(0.03, 0, 0.012);
+switchGroup.add(led);
+
+const leadaTag = makeTag('Leada', 'leada');
+leadaTag.position.set(0, 0.78, 0);
+leada.add(leadaTag);
+
+// ───────────────────────── Team am Tisch ─────────────────────────
+const deg = (d) => (d * Math.PI) / 180;
+const SEAT_R = 2.7;
+const PEOPLE = {
+  jonas: { name: 'Jonas', angle: deg(150), color: '#6F8FA8' },
+  mira:  { name: 'Mira',  angle: deg(85), color: '#9B7FA6' },
+  selin: { name: 'Selin', angle: deg(-85), color: '#B08F6C' },
+  anna:  { name: 'Anna',  angle: deg(-150), color: '#9DB0AA', absent: true },
+};
+const seatPos = (a, r = SEAT_R, y = 0) => new THREE.Vector3(Math.sin(a) * r, y, Math.cos(a) * r);
+
+const chairMat = new THREE.MeshStandardMaterial({ color: '#232d2a', roughness: 0.8 });
+for (const [id, p] of Object.entries(PEOPLE)) {
+  const g = new THREE.Group();
+  g.position.copy(seatPos(p.angle));
+  g.lookAt(0, 0, 0);
+  scene.add(g);
+
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.07, 0.58), chairMat);
+  seat.position.y = 0.46;
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.7, 0.07), chairMat);
+  back.position.set(0, 0.84, -0.28);
+  seat.castShadow = back.castShadow = true;
+  g.add(seat, back);
+
+  const mat = p.absent
+    ? new THREE.MeshStandardMaterial({ color: p.color, transparent: true, opacity: 0.12, roughness: 1, depthWrite: false })
+    : new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.75 });
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.23, 0.42, 8, 24), mat);
+  body.position.set(0, 0.98, -0.02);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 32, 24), mat);
+  head.position.set(0, 1.56, 0.03);
+  if (!p.absent) body.castShadow = head.castShadow = true;
+  g.add(body, head);
+  if (p.absent) {
+    const lines = new THREE.LineBasicMaterial({ color: '#9DB0AA', transparent: true, opacity: 0.35 });
+    const outline = new THREE.LineSegments(new THREE.EdgesGeometry(body.geometry, 30), lines);
+    outline.position.copy(body.position);
+    g.add(outline);
+  }
+
+  // Leuchtring vor dem Platz, wenn die Person spricht
+  const speakRing = new THREE.Mesh(new THREE.RingGeometry(0.16, 0.19, 48), new THREE.MeshBasicMaterial({ color: ACCENT.clone(), transparent: true, opacity: 0, side: THREE.DoubleSide }));
+  speakRing.rotation.x = -Math.PI / 2;
+  speakRing.position.copy(seatPos(p.angle, 1.65, TABLE_Y + 0.003));
+  scene.add(speakRing);
+
+  const tag = makeTag(p.name, p.absent ? 'absent' : '', p.absent ? 'abwesend · hat etwas freigegeben' : '');
+  tag.position.set(0, 1.95, 0);
+  g.add(tag);
+
+  p.group = g; p.head = head; p.ring = speakRing; p.tag = tag;
+  p.mouth = seatPos(p.angle, SEAT_R - 0.15, 1.5);
+}
+
+function makeTag(text, cls = '', small = '') {
+  const el = document.createElement('div');
+  el.className = 'tag3d ' + cls;
+  el.textContent = text;
+  if (small) { const s = document.createElement('small'); s.textContent = small; el.appendChild(s); }
+  return new CSS2DObject(el);
+}
+
+// Worte fließen als Punkte zu Leada
+const P = REDUCED ? 50 : 150;
+const pGeo = new THREE.BufferGeometry();
+const pPos = new Float32Array(P * 3);
+const pT = Float32Array.from({ length: P }, () => Math.random());
+const pOff = Array.from({ length: P }, () => new THREE.Vector3((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.5));
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+const pMat = new THREE.PointsMaterial({ color: ACCENT.clone().multiplyScalar(1.5), size: 0.035, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+const particles = new THREE.Points(pGeo, pMat);
+particles.frustumCulled = false;
+scene.add(particles);
+
+// ───────────────────────── Ablauf des Treffens ─────────────────────────
+// who: leada | Personen-ID | system · look: wen Leada anschaut ('all' = in die Runde)
+// act: was auf dem Board passiert oder der Schalter (deklarativ, damit Zurückspulen stimmt)
+const INITIAL_CARDS = [
+  { id: 'c1', t: 'Onboarding-Dokument überarbeiten', m: 'Jonas · zugesagt letzte Woche, fällig heute', tag: 'Zusage', kind: 'ok' },
+];
+const BEATS = [
+  { who: 'system', text: 'Dienstag, 9:00 Uhr. Team-Weekly, 30 Minuten. Drei sind da, Annas Platz bleibt leer.' },
+  { who: 'leada', look: 'all', text: 'Guten Morgen. Wir haben 30 Minuten und drei Punkte. Anna ist heute nicht da, sie hat mir etwas für euch mitgegeben.' },
+  { who: 'leada', look: 'all', text: 'Zum Einstieg ein Satz von jedem: Womit kommst du heute rein?' },
+  { who: 'mira', text: 'Mit dem Kopf schon beim Kundentermin morgen, ehrlich gesagt.' },
+  { who: 'jonas', text: 'Gut gelaunt, der Release ist gestern sauber durchgelaufen.' },
+  { who: 'leada', look: 'selin', text: 'Selin, du warst letzte Woche viel im Support. Wie geht es dir damit?' },
+  { who: 'selin', text: 'Anstrengend. Aber es wird ruhiger.' },
+  { who: 'leada', look: 'jonas', think: true, text: 'Danke euch. Erster Punkt: Letzten Dienstag hast du zugesagt, das Onboarding-Dokument bis heute zu überarbeiten, Jonas. Wo steht das?' },
+  { who: 'jonas', text: 'Zur Hälfte. Für den Kundenteil brauche ich noch Mira.' },
+  { who: 'leada', look: 'mira', think: true, text: 'Soll ich das so festhalten: Jonas und Mira, Onboarding-Dokument fertig bis Freitag?' },
+  { who: 'mira', text: 'Ja, passt.', act: { update: { id: 'c1', m: 'Jonas & Mira · neu bis Freitag', tag: 'Zusage · bestätigt', kind: 'ok', note: 'festgehalten nach Bestätigung' } } },
+  { who: 'leada', look: 'anna', text: 'Zweiter Punkt. Anna hat mir für heute freigegeben: <q>Ab November kann ich die Kundenhotline nicht mehr allein übernehmen. Klärt bitte eine Vertretung.</q> Mehr weiß ich dazu nicht, und ich entscheide nichts für sie.' },
+  { who: 'selin', text: 'Kurz unter uns, bevor wir darüber reden …', act: { mute: true } },
+  { who: 'system', muted: true, text: 'Selin legt den Schalter am Sockel um. Das Team spricht ein paar Minuten ohne Leada.' },
+  { who: 'system', act: { mute: false }, text: 'Der Schalter ist wieder umgelegt.' },
+  { who: 'leada', look: 'all', text: 'Ich bin wieder da. Was gerade gesagt wurde, weiß ich nicht, und das ist gut so. Wie wollt ihr mit Annas Punkt weitermachen?' },
+  { who: 'jonas', text: 'Selin und ich wechseln uns bei der Hotline ab. Aber Anna soll mitentscheiden.' },
+  { who: 'leada', look: 'jonas', think: true, text: 'Dann halte ich es als Vorschlag fest, nicht als Entscheidung. Ich lege ihn Anna vor, sie bestätigt oder ändert ihn.', act: { add: { id: 'c2', t: 'Vertretung Kundenhotline ab November', m: 'Vorschlag: Selin & Jonas im Wechsel', tag: 'Vorschlag · wartet auf Anna', kind: 'wait', note: 'Anna entscheidet mit' } } },
+  { who: 'leada', look: 'all', text: 'Noch vier Minuten. Der dritte Punkt, die Urlaubsplanung, passt nicht mehr sauber hinein. Verschieben wir ihn auf Donnerstag?' },
+  { who: 'mira', text: 'Ja, lieber verschieben.', act: { add: { id: 'c3', t: 'Urlaubsplanung erstes Quartal', m: 'verschoben aus dem Weekly', tag: 'Donnerstag', kind: '' } } },
+  { who: 'leada', look: 'all', text: 'Zusammengefasst: eine Zusage mit neuem Termin, ein Vorschlag für Anna, ein Punkt auf Donnerstag. Am Freitag frage ich nach, wie es gelaufen ist. Danke euch.' },
+  { who: 'system', end: true, text: 'Ende des Treffens. Leada kehrt in die Ruhe zurück.' },
+];
+
+function deriveAt(i) {
+  const cards = structuredClone(INITIAL_CARDS);
+  let muted = false;
+  for (let k = 0; k <= i; k++) {
+    const a = BEATS[k]?.act;
+    if (!a) continue;
+    if (a.mute !== undefined) muted = a.mute;
+    if (a.add) cards.push({ ...a.add });
+    if (a.update) Object.assign(cards.find((c) => c.id === a.update.id), a.update);
+  }
+  return { cards, muted };
+}
+
+// ───────────────────────── Zustand ─────────────────────────
+const S = {
+  state: 'rest',           // rest | listen | think | speak | mute
+  muted: false,
+  speaker: null,           // Person, die gerade spricht
+  look: 'all',             // wen Leada ansieht
+  idx: -1,
+  playing: false,
+  manual: false,
+  cinematic: true,
+  voice: false,
+  typing: false,
+  speechOn: false,
+};
+let timers = [];
+let typeTimer = null;
+const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+const clearTimers = () => { timers.forEach(clearTimeout); timers = []; clearInterval(typeTimer); };
+
+const STATE_INFO = {
+  rest: 'Ruhe: Leada atmet langsam. Sie ist da, drängt sich aber nicht auf.',
+  listen: 'Zuhören: Der Lichtbogen wendet sich der sprechenden Person zu, ihre Worte fließen als Punkte zu Leada.',
+  think: 'Denken: Der Bogen kreist. Leada sortiert, was gesagt wurde, bevor sie etwas vorschlägt.',
+  speak: 'Sprechen: Der goldene Wellenzug unter den Augen ist Leadas Stimme. Sie sieht die Person an, die sie anspricht.',
+  mute: 'Stumm: Der Schalter am Sockel trennt das Mikrofon. Licht aus, Augen zu. Leada hört nichts und merkt sich nichts.',
+};
+
+function setState(st) {
+  S.state = st;
+  document.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.state === st)));
+  $('stateInfo').textContent = STATE_INFO[st];
+  for (const [id, p] of Object.entries(PEOPLE)) {
+    p.tag.element.classList.toggle('speaking', S.speaker === id && st === 'listen');
+    p.tag.element.classList.toggle('addressed', S.look === id && st === 'speak');
+  }
+}
+
+function setMuted(m) {
+  S.muted = m;
+  $('mute').setAttribute('aria-pressed', String(m));
+  $('mutebadge').classList.toggle('on', m);
+  if (m) { setState('mute'); if (S.voice) speechSynthesis.cancel(); }
+  else if (S.state === 'mute') setState('rest');
+}
+
+function renderBoard(i) {
+  const { cards } = deriveAt(i);
+  const a = BEATS[i]?.act;
+  const fresh = new Set([a?.add?.id, a?.update?.id].filter(Boolean));
+  $('cards').innerHTML = cards.map((c) => `
+    <li class="card${fresh.has(c.id) ? ' fresh' : ''}">
+      <div class="t">${c.t}</div><div class="m">${c.m}</div>
+      <span class="tag ${c.kind}">${c.tag}</span>
+      ${c.note && fresh.has(c.id) ? `<div class="note">✓ ${c.note}</div>` : ''}
+    </li>`).join('');
+}
+
+function setSub(cls, who, html, type, onDone) {
+  const sub = $('sub');
+  sub.className = 'panel ' + cls;
+  $('whoName').textContent = who;
+  const el = $('subText');
+  clearInterval(typeTimer);
+  if (!type || REDUCED) { el.innerHTML = html; S.typing = false; onDone?.(); return; }
+  // Schreibmaschine über den reinen Text, HTML (das Zitat) erst am Ende vollständig
+  const plain = html.replace(/<[^>]+>/g, '');
+  let n = 0;
+  S.typing = true;
+  const speed = cls === 'leada' ? 30 : 24;
+  typeTimer = setInterval(() => {
+    n += 1;
+    el.textContent = plain.slice(0, n);
+    if (n >= plain.length) { clearInterval(typeTimer); el.innerHTML = html; S.typing = false; onDone?.(); }
+  }, speed);
+}
+
+function speakAloud(html, onEnd) {
+  if (!S.voice || !('speechSynthesis' in window)) return false;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(html.replace(/<[^>]+>/g, ''));
+  u.lang = 'de-DE';
+  const v = speechSynthesis.getVoices().find((x) => x.lang?.toLowerCase().startsWith('de'));
+  if (v) u.voice = v;
+  u.rate = 1.03;
+  S.speechOn = true;
+  u.onend = u.onerror = () => { S.speechOn = false; onEnd(); };
+  speechSynthesis.speak(u);
+  return true;
+}
+
+function goTo(i) {
+  clearTimers();
+  if (S.voice) speechSynthesis.cancel();
+  S.speechOn = false;
+  S.manual = false;
+  i = Math.max(0, Math.min(BEATS.length - 1, i));
+  S.idx = i;
+  const b = BEATS[i];
+  renderBoard(i);
+  const { muted } = deriveAt(i);
+  $('fill').style.width = `${((i + 1) / BEATS.length) * 100}%`;
+  $('count').textContent = `${i + 1} / ${BEATS.length}`;
+
+  const advance = (hold) => { if (S.playing && i < BEATS.length - 1) later(() => goTo(i + 1), hold); else if (i === BEATS.length - 1) stopPlaying(true); };
+
+  S.muted = muted;
+  setMuted(muted);
+
+  if (b.who === 'leada') {
+    S.speaker = null;
+    S.look = b.look || 'all';
+    const talk = () => {
+      setState('speak');
+      let typed = false, spoken = !speakAloud(b.text, () => { spoken = true; if (typed) advance(500); });
+      setSub('leada', 'Leada', b.text, true, () => { typed = true; if (spoken) advance(1500); });
+    };
+    if (b.think && !REDUCED) { setState('think'); setSub('leada', 'Leada', '…', false); later(talk, 1100); }
+    else talk();
+  } else if (PEOPLE[b.who]) {
+    S.speaker = b.who;
+    S.look = b.who;
+    if (!muted) setState('listen');
+    setSub(muted ? 'muted' : 'person', PEOPLE[b.who].name, b.text, true, () => advance(1300));
+  } else {
+    S.speaker = null;
+    S.look = 'all';
+    if (!muted) setState('rest');
+    setSub(b.muted ? 'muted system' : 'system', b.muted ? 'Stumm' : 'Team-Weekly', b.text, false);
+    advance(b.muted ? 3400 : 2600);
+  }
+}
+
+function startPlaying() {
+  S.playing = true;
+  $('play').innerHTML = '❚❚<span class="lbl">Pause</span>';
+  $('play').setAttribute('aria-label', 'Pause');
+  if (S.manual || S.idx < 0 || S.idx >= BEATS.length - 1) goTo(S.idx >= BEATS.length - 1 || S.idx < 0 ? 0 : S.idx);
+  else goTo(S.idx + 1);
+}
+function stopPlaying(ended = false) {
+  S.playing = false;
+  clearTimers();
+  if (S.voice && !ended) speechSynthesis.cancel();
+  $('play').innerHTML = ended ? '↺<span class="lbl">Noch einmal</span>' : '▶<span class="lbl">Abspielen</span>';
+  $('play').setAttribute('aria-label', ended ? 'Noch einmal' : 'Abspielen');
+}
+
+function manualState(st) {
+  stopPlaying();
+  S.manual = true;
+  if (st === 'mute') { setMuted(true); return; }
+  if (S.muted) setMuted(false);
+  if (st === 'listen') { S.speaker = S.speaker && PEOPLE[S.speaker] && !PEOPLE[S.speaker].absent ? S.speaker : 'mira'; S.look = S.speaker; }
+  else { S.speaker = null; S.look = 'all'; }
+  setState(st);
+  setSub('system', 'Zustand', STATE_INFO[st], false);
+}
+
+// ───────────────────────── Bedienung ─────────────────────────
+$('play').onclick = () => (S.playing ? stopPlaying() : startPlaying());
+$('next').onclick = () => { stopPlaying(); goTo(S.idx + 1); };
+$('prev').onclick = () => { stopPlaying(); goTo(S.idx - 1); };
+$('mute').onclick = toggleMute;
+$('cam').onclick = () => { S.cinematic = !S.cinematic; $('cam').setAttribute('aria-pressed', String(S.cinematic)); };
+$('voice').onclick = () => {
+  S.voice = !S.voice;
+  $('voice').setAttribute('aria-pressed', String(S.voice));
+  $('voice').firstChild.textContent = S.voice ? '🔊' : '🔈';
+  if (!S.voice && 'speechSynthesis' in window) speechSynthesis.cancel();
+};
+document.querySelectorAll('.chip').forEach((c) => (c.onclick = () => manualState(c.dataset.state)));
+
+function toggleMute() {
+  // Der Schalter gehört dem Team: er unterbricht auch das laufende Treffen
+  stopPlaying();
+  S.manual = true;
+  setMuted(!S.muted);
+  if (!S.muted) { S.speaker = null; S.look = 'all'; setState('rest'); }
+  setSub(S.muted ? 'muted system' : 'system', S.muted ? 'Stumm' : 'Stummschalter', S.muted ? STATE_INFO.mute : 'Mikrofon wieder verbunden. Leada hört wieder zu, wenn sie angesprochen wird.', false);
+}
+
+function togglePanel(btn, panel) {
+  const open = !panel.classList.contains('open');
+  document.querySelectorAll('#states, #board').forEach((p) => p.classList.remove('open'));
+  document.querySelectorAll('#toggles .btn').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+  if (open) { panel.classList.add('open'); btn.setAttribute('aria-expanded', 'true'); }
+}
+$('tgStates').onclick = () => togglePanel($('tgStates'), $('states'));
+$('tgBoard').onclick = () => togglePanel($('tgBoard'), $('board'));
+
+addEventListener('keydown', (e) => {
+  if ($('intro').style.display !== 'none' && e.key === 'Escape') { closeIntro(false); return; }
+  if (e.target.closest('input')) return;
+  if (e.key === ' ') { e.preventDefault(); $('play').click(); }
+  else if (e.key === 'ArrowRight') $('next').click();
+  else if (e.key === 'ArrowLeft') $('prev').click();
+  else if (e.key.toLowerCase() === 'm') toggleMute();
+});
+
+function closeIntro(play) {
+  $('intro').style.display = 'none';
+  if ($('introVoice').checked && !S.voice) $('voice').click();
+  if (play) startPlaying();
+  else { S.manual = true; setState('rest'); }
+}
+$('start').onclick = () => closeIntro(true);
+$('explore').onclick = () => closeIntro(false);
+$('start').focus();
+
+// Klick auf den Sockel = Stummschalter
+const ray = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+const pickables = [base, switchPlate, lever];
+let downAt = null;
+canvas.addEventListener('pointerdown', (e) => (downAt = [e.clientX, e.clientY]));
+canvas.addEventListener('pointerup', (e) => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) return;
+  if (pick(e)) toggleMute();
+});
+canvas.addEventListener('pointermove', (e) => {
+  // Wer selbst dreht, übernimmt die Kamera (ein bloßer Klick nicht)
+  if (downAt && e.buttons && S.cinematic && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) $('cam').click();
+  canvas.style.cursor = pick(e) ? 'pointer' : 'grab';
+});
+function pick(e) {
+  ndc.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  return ray.intersectObjects(pickables, false).length > 0;
+}
+
+// Dock-Höhe für die mobilen Panels
+const ro = new ResizeObserver(() => document.documentElement.style.setProperty('--dock-h', $('dock').offsetHeight + 'px'));
+ro.observe($('dock'));
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+  labelRenderer.setSize(innerWidth, innerHeight);
+});
+
+// ───────────────────────── Animation ─────────────────────────
+const lerp = THREE.MathUtils.lerp;
+const damp = (a, b, k, dt) => lerp(a, b, 1 - Math.exp(-k * dt));
+function dampAngle(a, b, k, dt) {
+  let d = ((b - a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+  return a + d * (1 - Math.exp(-k * dt));
+}
+const center = new THREE.Vector3(0, TABLE_Y + HEAD_Y, 0);
+const narrow = () => innerWidth / innerHeight < 0.85;
+
+const V = { core: 0.5, ring: 0.4, arc: 0, bars: 0, part: 0, eye: 1, glow: 1.2, faceYaw: 0, arcYaw: 0, think: 0, camYaw: 0, camR: 6.3, camY: 3.3, blink: 1 };
+let nextBlink = 2;
+camera.position.set(0, 3.3, 6.3);
+
+const clock = new THREE.Clock();
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+  const st = S.state;
+
+  // Wohin schaut Leada?
+  let lookYaw;
+  if (S.look && PEOPLE[S.look]) lookYaw = PEOPLE[S.look].angle;
+  else lookYaw = st === 'mute' ? 0 : Math.sin(t * (REDUCED ? 0.15 : 0.35)) * 1.5;
+  if (st === 'think') lookYaw += Math.sin(t * 1.3) * 0.25;
+
+  // Zielwerte je Zustand
+  const breath = 0.5 + 0.5 * Math.sin(t * (REDUCED ? 0.6 : 1.1));
+  const speaking = st === 'speak' && (S.typing || S.speechOn || S.manual);
+  const amp = speaking ? 0.45 + 0.55 * Math.abs(Math.sin(t * 9.1) * Math.sin(t * 5.3 + 1)) : 0;
+  const T = {
+    rest:   { core: 0.35 + breath * 0.3, ring: 0.25 + breath * 0.15, arc: 0, bars: 0, part: 0, eye: 1, glow: 0.7 + breath * 0.5 },
+    listen: { core: 0.95, ring: 0.6, arc: 0.95, bars: 0, part: 0.9, eye: 1.12, glow: 1.6 },
+    think:  { core: 0.7 + Math.sin(t * 4) * 0.25, ring: 0.5, arc: 0.8, bars: 0, part: 0, eye: 0.85, glow: 1.3 },
+    speak:  { core: 1.0 + amp * 0.6, ring: 0.7, arc: 0, bars: speaking ? 1 : 0.35, part: 0, eye: 1, glow: 1.6 + amp },
+    mute:   { core: 0.03, ring: 0, arc: 0, bars: 0, part: 0, eye: 0.12, glow: 0 },
+  }[st];
+
+  const k = 4;
+  for (const key of ['core', 'ring', 'arc', 'bars', 'part', 'eye', 'glow']) V[key] = damp(V[key], T[key], key === 'eye' ? 8 : k, dt);
+  V.faceYaw = dampAngle(V.faceYaw, lookYaw, st === 'mute' ? 1 : 3.2, dt);
+  if (st === 'think') V.arcYaw += dt * 3.2;
+  else V.arcYaw = dampAngle(V.arcYaw, (S.speaker && PEOPLE[S.speaker] ? PEOPLE[S.speaker].angle : lookYaw) + Math.PI / 2 - Math.PI / 5.2, 3, dt);
+
+  // Blinzeln
+  nextBlink -= dt;
+  if (nextBlink < 0) { V.blink = 0.1; nextBlink = 2.5 + Math.random() * 3.5; }
+  V.blink = damp(V.blink, 1, 14, dt);
+
+  core.material.emissiveIntensity = V.core;
+  ringMat.opacity = V.ring;
+  arcMat.opacity = V.arc;
+  arcPivot.rotation.y = V.arcYaw;
+  barMat.opacity = V.bars;
+  pMat.opacity = V.part;
+  glow.intensity = V.glow;
+  face.rotation.y = V.faceYaw;
+  face.rotation.x = st === 'think' ? -0.12 : st === 'mute' ? 0.25 : 0;
+  eyeMat.opacity = st === 'mute' ? 0.25 : 1;
+  eyes.forEach((e) => { e.scale.y = 1.3 * V.eye * V.blink; e.scale.x = 1 + (1 - V.eye) * 0.6; });
+  bars.forEach((b, i) => { const n = Math.abs(Math.sin(t * (7 + i * 1.7) + i * 1.3)); b.scale.y = 0.25 + (speaking ? n * (1.3 - Math.abs(i - 3) * 0.22) : 0); });
+  const muteCol = S.muted ? CORAL : ACCENT;
+  ledMat.color.copy(muteCol);
+  lever.position.x = damp(lever.position.x, S.muted ? 0.018 : -0.018, 10, dt);
+  leada.position.y = TABLE_Y + (st === 'rest' ? Math.sin(t * 1.1) * 0.004 : 0);
+
+  // Personen
+  for (const [id, p] of Object.entries(PEOPLE)) {
+    const talking = S.speaker === id && S.typing;
+    p.ring.material.opacity = damp(p.ring.material.opacity, S.speaker === id ? (S.muted ? 0.15 : 0.8) : 0, 5, dt);
+    p.ring.material.color.copy(S.muted ? CORAL : ACCENT);
+    p.head.position.y = 1.56 + (talking && !REDUCED ? Math.abs(Math.sin(t * 8)) * 0.012 : 0);
+  }
+
+  // Partikel: von der sprechenden Person zu Leada
+  if (V.part > 0.01 && S.speaker && PEOPLE[S.speaker]) {
+    const src = PEOPLE[S.speaker].mouth;
+    for (let i = 0; i < P; i++) {
+      pT[i] = (pT[i] + dt * (REDUCED ? 0.18 : 0.45)) % 1;
+      const u = pT[i], e = u * u * (3 - 2 * u);
+      const x = lerp(src.x + pOff[i].x * (1 - u), center.x, e);
+      const y = lerp(src.y + pOff[i].y * (1 - u), center.y, e) + Math.sin(u * Math.PI) * 0.3;
+      const z = lerp(src.z + pOff[i].z * (1 - u), center.z, e);
+      pPos.set([x, y, z], i * 3);
+    }
+    pGeo.attributes.position.needsUpdate = true;
+  }
+
+  // Kamera: du sitzt auf dem Platz, dem Leada sich zuwendet
+  if (S.cinematic) {
+    const tgt = S.look && PEOPLE[S.look] && st !== 'mute' ? PEOPLE[S.look].angle : 0;
+    const wide = narrow();
+    const r = PEOPLE[S.look] && st !== 'mute' ? (wide ? 6.6 : 5.4) : (wide ? 8.6 : 6.3);
+    const y = PEOPLE[S.look] && st !== 'mute' ? 3.0 : (wide ? 4.2 : 3.3);
+    V.camYaw = dampAngle(V.camYaw, tgt, REDUCED ? 6 : 1.1, dt);
+    V.camR = damp(V.camR, r, 1.1, dt);
+    V.camY = damp(V.camY, y, 1.1, dt);
+    const drift = REDUCED ? 0 : Math.sin(t * 0.2) * 0.06;
+    camera.position.set(Math.sin(V.camYaw + drift) * V.camR, V.camY, Math.cos(V.camYaw + drift) * V.camR);
+  } else {
+    // Freie Kamera: Startwerte nachführen, damit „Kamera folgt“ weich wieder einsetzt
+    V.camYaw = Math.atan2(camera.position.x, camera.position.z);
+    V.camR = Math.hypot(camera.position.x, camera.position.z);
+    V.camY = camera.position.y;
+  }
+  controls.update();
+
+  composer.render();
+  labelRenderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+
+renderBoard(-1);
+$('count').textContent = `0 / ${BEATS.length}`;
+setState('rest');
+tick();
+</script>
+</body>
+</html>
